@@ -3,49 +3,62 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Three.js Game with Chat</title>
+    <title>Three.js Game</title>
     <style>
-        body { margin: 0; overflow: hidden; }
-        
-        /* Contenedor del chat y del input */
-        #chat-container {
+        body { margin: 0; }
+        canvas { display: block; }
+        #namePrompt {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+        }
+        #chat {
             position: absolute;
             bottom: 0;
             left: 0;
-            width: 300px;
-            box-sizing: border-box;
-        }
-
-        /* Estilo del chat */
-        #chat {
-            width: 100%;
-            max-height: 150px;
+            width: 300px; /* Ajusta el ancho según tus preferencias */
+            height: 150px; /* Ajusta la altura según tus preferencias */
             overflow-y: auto;
-            background-color: rgba(0, 0, 0, 0.5);
+            background-color: rgba(0, 0, 0, 0.7);
             color: white;
-            padding: 10px;
-            font-family: Arial, sans-serif;
-            box-sizing: border-box;
+            padding: 5px;
+            box-sizing: border-box; /* Asegura que el padding no afecte el tamaño total */
         }
-
-        /* Estilo del input */
         #messageInput {
-            width: 100%;
-            padding: 10px;
-            font-size: 16px;
-            box-sizing: border-box;
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 300px; /* Debe coincidir con el ancho del #chat */
+            padding: 5px;
             border: none;
-            outline: none;
+            box-sizing: border-box; /* Asegura que el padding no afecte el tamaño total */
+        }
+        #joinButton {
+            margin-top: 10px;
         }
     </style>
 </head>
 <body>
-    <div id="chat-container">
-        <div id="chat"></div>
-        <input id="messageInput" type="text" placeholder="Type a message..." />
+    <!-- Pantalla de nombre -->
+    <div id="namePrompt">
+        <h2>Enter Your Name</h2>
+        <input id="nameInput" type="text" placeholder="Enter your name">
+        <button id="joinButton">Join Game</button>
     </div>
+
+    <!-- Espacio para el chat -->
+    <div id="chat"></div>
+    <input id="messageInput" type="text" placeholder="Type a message...">
+
+    <!-- Cargar scripts -->
     <script src="/socket.io/socket.io.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/controls/OrbitControls.js"></script>
     <script src="script.js"></script>
 </body>
 </html>

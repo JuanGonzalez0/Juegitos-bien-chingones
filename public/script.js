@@ -7,11 +7,23 @@ const renderer = new THREE.WebGLRenderer();
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
+// Crear el fondo
+const loader = new THREE.CubeTextureLoader();
+const texture = loader.load([
+    'textures/px.jpg', // derecha
+    'textures/nx.jpg', // izquierda
+    'textures/py.jpg', // arriba
+    'textures/ny.jpg', // abajo
+    'textures/pz.jpg', // adelante
+    'textures/nz.jpg'  // atrás
+]);
+scene.background = texture;
+
 // Crear el césped
 const grassGeometry = new THREE.PlaneGeometry(50, 50);
-const grassMaterial = new THREE.MeshBasicMaterial({ color: 0x228B22 });
+const grassMaterial = new THREE.MeshBasicMaterial({ color: 0x87cefa });
 const grass = new THREE.Mesh(grassGeometry, grassMaterial);
-grass.rotation.x = -Math.PI / 2; // Rotar el césped para que esté plano
+grass.rotation.x = -Math.PI / 2;
 scene.add(grass);
 
 // Función para crear árboles
@@ -43,15 +55,21 @@ const labels = {};
 
 // Crear cubo y agregarlo a la escena
 function createCube(id, position, name) {
+    // Cargar la textura
+    const textureLoader = new THREE.TextureLoader();
+    const texture = textureLoader.load('textures/texture.jpg'); // Ruta a la textura
+
+    // Crear el material con la textura
+    const material = new THREE.MeshBasicMaterial({ map: texture });
+
     // Crear el cubo
     const geometry = new THREE.BoxGeometry();
-    const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
     const cube = new THREE.Mesh(geometry, material);
-    cube.position.set(position.x, position.y, position.z);
+    cube.position.set(position.x, position.y + 1, position.z); // Ajustar altura
     scene.add(cube);
     cubes[id] = cube;
 
-    // Crear la etiqueta
+    // Crear y agregar la etiqueta
     const loader = new THREE.FontLoader();
     loader.load('https://threejs.org/examples/fonts/helvetiker_regular.typeface.json', (font) => {
         const textGeometry = new THREE.TextGeometry(name, {
@@ -61,7 +79,7 @@ function createCube(id, position, name) {
         });
         const textMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
         const textMesh = new THREE.Mesh(textGeometry, textMaterial);
-        textMesh.position.set(position.x, position.y + 1, position.z);
+        textMesh.position.set(position.x, position.y + 2, position.z); // Ajustar altura
         scene.add(textMesh);
         labels[id] = textMesh;
     });
@@ -94,16 +112,33 @@ socket.on('chatMessage', (message) => {
     addMessage(message);
 });
 
-// Enviar el nombre del jugador al conectarse
-socket.emit('newPlayer', { name: 'Player' + Math.floor(Math.random() * 1000) });
+// Solicitar nombre del jugador al ingresar
+const namePrompt = document.getElementById('namePrompt');
+const nameInput = document.getElementById('nameInput');
+const joinButton = document.getElementById('joinButton');
+
+joinButton.addEventListener('click', () => {
+    const name = nameInput.value.trim();
+    if (name) {
+        socket.emit('newPlayer', { name: name });
+        namePrompt.style.display = 'none'; // Ocultar pantalla de nombre
+    }
+});
 
 // Mover el cubo con las teclas de flecha
 function moveCube(cube, direction) {
     const speed = 0.5;
+    const groundLevel = 0; // Nivel del césped
+
     if (direction === 'ArrowUp') cube.position.z -= speed;
     if (direction === 'ArrowDown') cube.position.z += speed;
     if (direction === 'ArrowLeft') cube.position.x -= speed;
     if (direction === 'ArrowRight') cube.position.x += speed;
+
+    // Evitar que el cubo atraviese el suelo
+    if (cube.position.y < groundLevel) {
+        cube.position.y = groundLevel;
+    }
 }
 
 // Actualizar la posición de la cámara para vista en tercera persona
@@ -124,7 +159,7 @@ socket.on('init', ({ id, position, name }) => {
             socket.emit('move', { x: cubes[socket.id].position.x, y: cubes[socket.id].position.y, z: cubes[socket.id].position.z });
             // Actualizar la posición de la etiqueta del jugador actual
             if (labels[socket.id]) {
-                labels[socket.id].position.set(cubes[socket.id].position.x, cubes[socket.id].position.y + 1, cubes[socket.id].position.z);
+                labels[socket.id].position.set(cubes[socket.id].position.x, cubes[socket.id].position.y + 2, cubes[socket.id].position.z);
             }
         }
     });
@@ -149,7 +184,7 @@ socket.on('move', ({ id, position }) => {
     if (cubes[id]) {
         cubes[id].position.set(position.x, position.y, position.z);
         if (labels[id]) {
-            labels[id].position.set(position.x, position.y + 1, position.z);
+            labels[id].position.set(position.x, position.y + 2, position.z);
         }
     }
 });
