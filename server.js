@@ -15,10 +15,11 @@ io.on('connection', (socket) => {
 
     // Guardar el nuevo jugador en el servidor
     socket.on('newPlayer', ({ name }) => {
-        players[socket.id] = { position: { x: 0, y: 0, z: 0 }, name: name };
-        socket.emit('init', { id: socket.id, position: players[socket.id].position, name: name });
+        const startTime = Date.now(); // Guardar el tiempo de conexión
+        players[socket.id] = { position: { x: 0, y: 0, z: 0 }, name: name, startTime: startTime, health: 100 };
+        socket.emit('init', { id: socket.id, position: players[socket.id].position, name: name, startTime: startTime });
         socket.broadcast.emit('newPlayer', { id: socket.id, position: players[socket.id].position, name: name });
-        socket.emit('allPlayers', players);
+        socket.emit('allPlayers', players); // Emitir el estado completo de todos los jugadores al nuevo jugador
     });
 
     // Manejar movimiento del cubo
@@ -36,11 +37,39 @@ io.on('connection', (socket) => {
         io.emit('chatMessage', formattedMessage); // Enviar mensaje a todos
     });
 
+    // Manejar ataques
+    socket.on('attack', () => {
+        const attacker = players[socket.id];
+        if (attacker) {
+            for (const id in players) {
+                if (id !== socket.id) {
+                    const defender = players[id];
+                    // Verificar si el atacante está en el rango del defensor
+                    const distance = Math.sqrt(
+                        Math.pow(attacker.position.x - defender.position.x, 2) +
+                        Math.pow(attacker.position.z - defender.position.z, 2)
+                    );
+                    if (distance < 2) { // Rango de ataque
+                        defender.health -= 10; // Reducir la salud del defensor
+                        io.to(id).emit('updateHealth', { id: id, health: defender.health }); // Actualizar al defensor
+                        socket.emit('updateHealth', { id: id, health: defender.health }); // Actualizar al atacante también
+                        if (defender.health <= 0) {
+                            io.to(id).emit('defeated', { timeSurvived: Math.floor((Date.now() - defender.startTime) / 1000) }); // Notificar derrota
+                            io.emit('removePlayer', id); // Eliminar jugador de la escena
+                            delete players[id]; // Eliminar jugador del servidor
+                        }
+                        break; // Solo un ataque por acción
+                    }
+                }
+            }
+        }
+    });
+
     // Manejar desconexión
     socket.on('disconnect', () => {
         console.log('user disconnected');
         delete players[socket.id];
-        io.emit('removeCube', socket.id);
+        io.emit('removePlayer', socket.id);
     });
 });
 

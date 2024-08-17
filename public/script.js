@@ -19,35 +19,56 @@ const texture = loader.load([
 ]);
 scene.background = texture;
 
-// Crear el césped
-const grassGeometry = new THREE.PlaneGeometry(50, 50);
-const grassMaterial = new THREE.MeshBasicMaterial({ color: 0x87cefa });
-const grass = new THREE.Mesh(grassGeometry, grassMaterial);
-grass.rotation.x = -Math.PI / 2;
-scene.add(grass);
+// Crear el cuadrilátero con cuerdas
 
-// Función para crear árboles
-function createTree(x, z) {
-    const trunkGeometry = new THREE.CylinderGeometry(0.2, 0.2, 2);
-    const trunkMaterial = new THREE.MeshBasicMaterial({ color: 0x8B4513 });
-    const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
-    trunk.position.set(x, 1, z);
+// Crear la base del cuadrilátero
+const quadGeometry = new THREE.PlaneGeometry(65, 65); // Tamaño del cuadrilátero
+const quadMaterial = new THREE.MeshBasicMaterial({ color: 0x808080 }); // Color azul claro
+const quad = new THREE.Mesh(quadGeometry, quadMaterial);
+quad.rotation.x = -Math.PI / 2; // Asegurar que esté en horizontal
+scene.add(quad);
 
-    const leavesGeometry = new THREE.SphereGeometry(1);
-    const leavesMaterial = new THREE.MeshBasicMaterial({ color: 0x228B22 });
-    const leaves = new THREE.Mesh(leavesGeometry, leavesMaterial);
-    leaves.position.set(x, 2.5, z);
+// Crear una función para crear cuerdas
+const createLine = (start, end, color) => {
+    const geometry = new THREE.BufferGeometry().setFromPoints([start, end]);
+    const material = new THREE.LineBasicMaterial({ color: color });
+    return new THREE.Line(geometry, material);
+};
 
-    scene.add(trunk);
-    scene.add(leaves);
+const ropeLength = 65; // Longitud del cuadrilátero
+const numLayers = 5; // Número de capas de cuerdas
+const offset = 1; // Espaciado entre las capas de cuerdas
+
+// Crear cuerdas en los bordes con superposiciones
+for (let i = 0; i < numLayers; i++) {
+    const layerOffset = i * offset;
+
+    // Cuerdas superiores
+    scene.add(createLine(
+        new THREE.Vector3(-ropeLength / 2, layerOffset, -ropeLength / 2),
+        new THREE.Vector3(ropeLength / 2, layerOffset, -ropeLength / 2),
+        0xff0000
+    ));
+    // Cuerdas derechas
+    scene.add(createLine(
+        new THREE.Vector3(ropeLength / 2, layerOffset, -ropeLength / 2),
+        new THREE.Vector3(ropeLength / 2, layerOffset, ropeLength / 2),
+        0xff0000
+    ));
+    // Cuerdas inferiores
+    scene.add(createLine(
+        new THREE.Vector3(ropeLength / 2, layerOffset, ropeLength / 2),
+        new THREE.Vector3(-ropeLength / 2, layerOffset, ropeLength / 2),
+        0xff0000
+    ));
+    // Cuerdas izquierdas
+    scene.add(createLine(
+        new THREE.Vector3(-ropeLength / 2, layerOffset, ropeLength / 2),
+        new THREE.Vector3(-ropeLength / 2, layerOffset, -ropeLength / 2),
+        0xff0000
+    ));
 }
 
-// Crear varios árboles en posiciones aleatorias
-for (let i = 0; i < 10; i++) {
-    const x = Math.random() * 20 - 10;
-    const z = Math.random() * 20 - 10;
-    createTree(x, z);
-}
 
 // Diccionario para los cubos y etiquetas
 const cubes = {};
@@ -148,9 +169,25 @@ function updateCamera(cube) {
     camera.lookAt(cube.position);
 }
 
+// Variable para almacenar el tiempo de conexión
+let startTime;
+
+// Mostrar el tiempo en la interfaz
+function updateTimer() {
+    if (startTime) {
+        const currentTime = Date.now();
+        const elapsedTime = Math.floor((currentTime - startTime) / 1000); // Tiempo en segundos
+        const minutes = Math.floor(elapsedTime / 60);
+        const seconds = elapsedTime % 60;
+        document.getElementById('timer').textContent = `Tiempo en partida: ${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+    }
+}
+
 // Recibir posición inicial
-socket.on('init', ({ id, position, name }) => {
+socket.on('init', ({ id, position, name, startTime: serverStartTime }) => {
     createCube(id, position, name);
+    startTime = serverStartTime; // Guardar el tiempo de conexión
+    setInterval(updateTimer, 1000); // Actualizar el temporizador cada segundo
 
     // Manejar los eventos del teclado
     document.addEventListener('keydown', (event) => {
@@ -197,6 +234,116 @@ socket.on('removeCube', (id) => {
             scene.remove(labels[id]);
         }
         delete cubes[id];
+        delete labels[id];
+    }
+});
+
+
+let health = 100; // Salud del jugador
+
+// Crear las barras de salud
+function createHealthBars(id) {
+    // Crear barra azul solo para el jugador actual
+    if (id === socket.id) {
+        const blueBarContainer = document.createElement('div');
+        blueBarContainer.className = 'health-bar-container';
+        blueBarContainer.id = `healthBarBlueContainer-${id}`;
+        blueBarContainer.style.position = 'fixed'; // Fija la posición en la pantalla
+        blueBarContainer.style.bottom = '10px'; // Ajustar según la posición deseada
+        blueBarContainer.style.right = '10px'; // Ajustar según la posición deseada
+
+        const blueBar = document.createElement('div');
+        blueBar.className = 'health-bar';
+        blueBar.id = `healthBarBlue-${id}`;
+        blueBar.style.width = '100%'; // Inicialmente lleno
+        blueBar.style.backgroundColor = 'blue'; // Color azul para el jugador actual
+
+        blueBarContainer.appendChild(blueBar);
+        document.body.appendChild(blueBarContainer); // Añadir a body o contenedor específico
+    }
+}
+
+// Actualizar la barra de salud azul
+function updateHealthBars(id, health) {
+    const blueHealthBar = document.getElementById(`healthBarBlue-${id}`);
+    if (blueHealthBar) {
+        blueHealthBar.style.width = `${health}%`;
+        blueHealthBar.style.backgroundColor = 'blue';
+    }
+}
+
+// Crear etiqueta de nombre
+function createLabel(id, name, position) {
+    if (labels[id]) {
+        scene.remove(labels[id]); // Eliminar etiqueta existente
+        delete labels[id];
+    }
+
+    const loader = new THREE.FontLoader();
+    loader.load('https://threejs.org/examples/fonts/helvetiker_regular.typeface.json', (font) => {
+        const textGeometry = new THREE.TextGeometry(name, {
+            font: font,
+            size: 0.5,
+            height: 0.1,
+        });
+        const textMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
+        const textMesh = new THREE.Mesh(textGeometry, textMaterial);
+        textMesh.position.set(position.x, position.y + 2, position.z); // Ajustar altura
+        scene.add(textMesh);
+        labels[id] = textMesh; // Guardar la etiqueta en el objeto labels
+    });
+}
+
+// Enviar ataque al servidor cuando se presiona la tecla 'z'
+document.addEventListener('keydown', (event) => {
+    if (event.key === 'z') {
+        socket.emit('attack');
+    }
+});
+
+// Mostrar pantalla de derrota
+socket.on('defeated', ({ timeSurvived }) => {
+    document.body.innerHTML = `<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background-color: rgba(0, 0, 0, 0.8); color: white; padding: 20px; border-radius: 10px;">
+        <h2>Game Over</h2>
+        <p>You survived for ${Math.floor(timeSurvived / 60)}:${timeSurvived % 60 < 10 ? '0' : ''}${timeSurvived % 60}</p>
+        <button onclick="window.location.reload();">Play Again</button>
+    </div>`;
+});
+
+// Inicializar el jugador
+socket.on('init', ({ id, position, name, startTime }) => {
+    createHealthBars(id);
+    createLabel(id, name, position); // Crear etiqueta de nombre
+    updateHealthBars(id, 100); // Inicializar la barra de salud con 100%
+});
+
+// Actualizar la salud de los jugadores
+socket.on('updateHealth', ({ id, health }) => {
+    updateHealthBars(id, health);
+});
+
+// Manejar la llegada de nuevos jugadores
+socket.on('newPlayer', ({ id, position, name }) => {
+    createHealthBars(id);
+    createLabel(id, name, position); // Crear etiqueta de nombre
+    updateHealthBars(id, 100); // Inicializar la barra de salud con 100%
+});
+
+// Eliminar el cubo, la barra de salud y la etiqueta del jugador
+socket.on('removePlayer', (id) => {
+    // Eliminar la barra de salud azul
+    const blueHealthBarContainer = document.getElementById(`healthBarBlueContainer-${id}`);
+    if (blueHealthBarContainer) {
+        blueHealthBarContainer.remove();
+    }
+    // Eliminar el cubo del jugador
+    if (cubes[id]) {
+        scene.remove(cubes[id]);
+        delete cubes[id];
+    }
+    // Eliminar la etiqueta del jugador
+    if (labels[id]) {
+        scene.remove(labels[id]);
         delete labels[id];
     }
 });
