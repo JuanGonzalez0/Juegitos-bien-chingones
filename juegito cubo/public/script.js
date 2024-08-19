@@ -23,7 +23,7 @@ scene.background = texture;
 
 // Crear la base del cuadrilátero
 const quadGeometry = new THREE.PlaneGeometry(65, 65); // Tamaño del cuadrilátero
-const quadMaterial = new THREE.MeshBasicMaterial({ color: 0x808080 }); // Color azul claro
+const quadMaterial = new THREE.MeshBasicMaterial({ color: 0x808080 }); // Color gris
 const quad = new THREE.Mesh(quadGeometry, quadMaterial);
 quad.rotation.x = -Math.PI / 2; // Asegurar que esté en horizontal
 scene.add(quad);
@@ -274,11 +274,6 @@ function updateHealthBars(id, health) {
 
 // Crear etiqueta de nombre
 function createLabel(id, name, position) {
-    if (labels[id]) {
-        scene.remove(labels[id]); // Eliminar etiqueta existente
-        delete labels[id];
-    }
-
     const loader = new THREE.FontLoader();
     loader.load('https://threejs.org/examples/fonts/helvetiker_regular.typeface.json', (font) => {
         const textGeometry = new THREE.TextGeometry(name, {
@@ -288,10 +283,18 @@ function createLabel(id, name, position) {
         });
         const textMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
         const textMesh = new THREE.Mesh(textGeometry, textMaterial);
-        textMesh.position.set(position.x, position.y + 2, position.z); // Ajustar altura
+        textMesh.position.set(position.x, position.y + 2, position.z);
         scene.add(textMesh);
-        labels[id] = textMesh; // Guardar la etiqueta en el objeto labels
+        labels[id] = textMesh; // Guardar la nueva etiqueta
     });
+}
+
+function updateLabel(id, name, position) {
+    if (labels[id]) {
+        scene.remove(labels[id]); // Eliminar etiqueta existente
+        delete labels[id];
+        createLabel(id, name, position); // Crear la nueva etiqueta
+    }
 }
 
 // Enviar ataque al servidor cuando se presiona la tecla 'z'
@@ -301,14 +304,22 @@ document.addEventListener('keydown', (event) => {
     }
 });
 
+// Mostrar la cantidad de derrotas para el atacante
+socket.on('updateKills', ({ kills }) => {
+    // Puedes mostrar las derrotas del atacante en algún elemento de la interfaz del juego
+    document.getElementById('killsDisplay').innerText = `Kills: ${kills}`;
+});
+
 // Mostrar pantalla de derrota
-socket.on('defeated', ({ timeSurvived }) => {
+socket.on('defeated', ({ timeSurvived, kills }) => {
     document.body.innerHTML = `<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background-color: rgba(0, 0, 0, 0.8); color: white; padding: 20px; border-radius: 10px;">
         <h2>Game Over</h2>
         <p>You survived for ${Math.floor(timeSurvived / 60)}:${timeSurvived % 60 < 10 ? '0' : ''}${timeSurvived % 60}</p>
+        <p>Your opponent defeated ${kills} player(s)</p>
         <button onclick="window.location.reload();">Play Again</button>
     </div>`;
 });
+
 
 // Inicializar el jugador
 socket.on('init', ({ id, position, name, startTime }) => {
@@ -327,6 +338,9 @@ socket.on('newPlayer', ({ id, position, name }) => {
     createHealthBars(id);
     createLabel(id, name, position); // Crear etiqueta de nombre
     updateHealthBars(id, 100); // Inicializar la barra de salud con 100%
+    if (!labels[id]) {
+        createLabel(id, name, position);
+    }
 });
 
 // Eliminar el cubo, la barra de salud y la etiqueta del jugador

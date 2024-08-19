@@ -16,7 +16,13 @@ io.on('connection', (socket) => {
     // Guardar el nuevo jugador en el servidor
     socket.on('newPlayer', ({ name }) => {
         const startTime = Date.now(); // Guardar el tiempo de conexión
-        players[socket.id] = { position: { x: 0, y: 0, z: 0 }, name: name, startTime: startTime, health: 100 };
+        players[socket.id] = { 
+            position: { x: 0, y: 0, z: 0 }, 
+            name: name, 
+            startTime: startTime, 
+            health: 100, 
+            kills: 0  // Nuevo campo para almacenar la cantidad de derrotas
+        };
         socket.emit('init', { id: socket.id, position: players[socket.id].position, name: name, startTime: startTime });
         socket.broadcast.emit('newPlayer', { id: socket.id, position: players[socket.id].position, name: name });
         socket.emit('allPlayers', players); // Emitir el estado completo de todos los jugadores al nuevo jugador
@@ -54,7 +60,17 @@ io.on('connection', (socket) => {
                         io.to(id).emit('updateHealth', { id: id, health: defender.health }); // Actualizar al defensor
                         socket.emit('updateHealth', { id: id, health: defender.health }); // Actualizar al atacante también
                         if (defender.health <= 0) {
-                            io.to(id).emit('defeated', { timeSurvived: Math.floor((Date.now() - defender.startTime) / 1000) }); // Notificar derrota
+                            attacker.kills += 1; // Incrementar el contador de derrotas del atacante
+                            
+                            // Notificar al defensor de su derrota y cuántos jugadores derrotó el atacante
+                            io.to(id).emit('defeated', { 
+                                timeSurvived: Math.floor((Date.now() - defender.startTime) / 1000), 
+                                kills: attacker.kills // Enviar el número de derrotas al cliente derrotado
+                            });
+                            
+                            // Notificar al atacante sobre su propio número de derrotas
+                            socket.emit('updateKills', { kills: attacker.kills });
+
                             io.emit('removePlayer', id); // Eliminar jugador de la escena
                             delete players[id]; // Eliminar jugador del servidor
                         }
