@@ -1,21 +1,38 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Auto con Cannon.js y Three.js</title>
-    <style>
-        body { margin: 0; }
-        canvas { display: block; }
-        #controls { position: absolute; top: 10px; left: 10px; z-index: 1; }
-        select { font-size: 16px; }
-    </style>
-</head>
-<body>
-    <div id="controls">
-        <label for="cameraSelect">Selecciona la cámara:</label>
-        <select id="cameraSelect"></select>
-    </div>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Auto con Cannon.js y Three.js</title>
+        <style>
+            body { margin: 0; }
+            canvas { display: block; }
+            #controls { position: absolute; top: 10px; left: 10px; z-index: 1; }
+            select { font-size: 16px; }
+            #joystick { 
+        position: absolute; 
+        bottom: 10px; 
+        left: 10px; 
+        width: 100px; 
+        height: 100px; 
+        background-color: rgba(0, 0, 255, 0.2); /* Añade un color de fondo para ver si se muestra */
+        border: 2px solid blue; /* Añade un borde para asegurarte de que se renderiza */
+    }
+        </style>
+    </head>
+    <body>
+        <div id="controls">
+            <label for="cameraSelect">Selecciona la cámara:</label>
+            <select id="cameraSelect"></select>
+            <label for="textureSelect">Selecciona la textura:</label>
+            <select id="textureSelect">
+                <option value="texture1.png">Textura 1</option>
+                <option value="texture2.png">Textura 2</option>
+            </select>
+        </div>
+        <div id="joystick"></div>
+    <script src="https://cdn.jsdelivr.net/npm/nipplejs@0.8.7/dist/nipplejs.min.js"></script>
+
     <script type="module">
         import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.module.js';
         import { World, Body, Box, Plane, Sphere, Vec3, PointToPointConstraint, Material } from 'https://cdn.jsdelivr.net/npm/cannon-es@0.20.0/dist/cannon-es.js';
@@ -36,6 +53,7 @@
         // Configuración del mundo físico de Cannon.js
         const world = new World();
         world.gravity.set(0, -9.82, 0); // Gravedad
+
 
         // Crear el coche
         const carGeometry = new THREE.BoxGeometry(3, 3, 3);
@@ -95,7 +113,7 @@
         }
         function createWheel(x, y, z) {
     const wheelRadius = 1; // Radio de la rueda
-    const wheelGeometry = new THREE.SphereGeometry(wheelRadius, 16, 16);
+    const wheelGeometry = new THREE.SphereGeometry(wheelRadius, 10, 10);
     const wheelMaterial = new THREE.MeshStandardMaterial({ color: 0x000000 });
     const wheelMesh = new THREE.Mesh(wheelGeometry, wheelMaterial);
     wheelMesh.position.set(x, y, z);
@@ -143,90 +161,122 @@ createWheelConstraints();
 
         // Manejar el menú de selección de cámaras
         async function initializeCameraSelection() {
-            const select = document.getElementById('cameraSelect');
-            const devices = await navigator.mediaDevices.enumerateDevices();
-            const videoDevices = devices.filter(device => device.kind === 'videoinput');
+    const select = document.getElementById('cameraSelect');
+    try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = devices.filter(device => device.kind === 'videoinput');
 
-            videoDevices.forEach(device => {
-                const option = document.createElement('option');
-                option.value = device.deviceId;
-                option.text = device.label || `Camera ${select.options.length + 1}`;
-                select.appendChild(option);
-            });
-
-            select.addEventListener('change', (event) => {
-                const deviceId = event.target.value;
-                startVideo(deviceId);
-            });
-
-            // Iniciar la primera cámara por defecto
-            if (videoDevices.length > 0) {
-                select.value = videoDevices[0].deviceId;
-                startVideo(videoDevices[0].deviceId);
-            }
+        if (videoDevices.length === 0) {
+            console.warn('No cameras found. Using default texture.');
+            loadDefaultTexture();  // Carga la textura predeterminada si no hay cámaras
+            return;
         }
 
-        async function startVideo(deviceId) {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    video: { deviceId: deviceId ? { exact: deviceId } : undefined }
-                });
-                video.srcObject = stream;
-                video.play();
-            } catch (error) {
-                console.error('Error accessing the camera:', error);
-            }
-        }
+        videoDevices.forEach(device => {
+            const option = document.createElement('option');
+            option.value = device.deviceId;
+            option.text = device.label || `Camera ${select.options.length + 1}`;
+            select.appendChild(option);
+        });
 
-        // Inicializar la selección de cámaras
-        initializeCameraSelection();
+        select.addEventListener('change', (event) => {
+            const deviceId = event.target.value;
+            startVideo(deviceId);
+        });
 
-        // Movimiento del coche con WASD
-        const keys = { w: false, a: false, s: false, d: false, f: false };
+        // Iniciar la primera cámara por defecto
+        select.value = videoDevices[0].deviceId;
+        startVideo(videoDevices[0].deviceId);
+    } catch (error) {
+        console.error('Error initializing camera selection:', error);
+        alert('Failed to initialize camera selection. Using default texture.');
+        loadDefaultTexture();  // Carga la textura predeterminada en caso de error
+    }
+}
 
-        window.addEventListener('keydown', (event) => {
-            if (keys.hasOwnProperty(event.key)) {
-                keys[event.key] = true;
+async function startVideo(deviceId) {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+            video: { deviceId: deviceId ? { exact: deviceId } : undefined }
+        });
+        video.srcObject = stream;
+        video.play();
+        video.addEventListener('loadeddata', () => {
+            // Solo iniciar el juego después de que el video esté listo
+            animate();
+        });
+    } catch (error) {
+        console.error('Error accessing the camera:', error);
+        alert('Error accessing the camera. Using default texture.');
+        loadDefaultTexture();  // Carga la textura predeterminada en caso de error
+    }
+}
+
+function loadDefaultTexture() {
+    const defaultTextureUrl = 'texture1.png'; // O 'texture2.png', el que prefieras como predeterminado
+    const loader = new THREE.TextureLoader();
+    loader.load(defaultTextureUrl, (texture) => {
+        carMaterial.map = texture;
+        carMaterial.needsUpdate = true;
+
+        // Asegúrate de que el juego se inicie después de cargar la textura
+        animate();
+    });
+}
+
+// Configuración inicial y manejo de errores
+window.addEventListener('load', () => {
+    initializeCameraSelection();
+});
+
+        // Configuración del joystick
+        const joystick = nipplejs.create({
+            zone: document.getElementById('joystick'),
+            color: 'blue',
+            size: 100,
+            position: { top: '0%', left: '0%' }
+        });
+
+        let movement = { x: 0, y: 0 };
+
+        joystick.on('move', (event, data) => {
+            if (data.direction) {
+                movement.x = data.vector.x;
+                movement.y = data.vector.y;
             }
         });
 
-        window.addEventListener('keyup', (event) => {
-            if (keys.hasOwnProperty(event.key)) {
-                keys[event.key] = false;
-            }
+        joystick.on('end', () => {
+            movement.x = 0;
+            movement.y = 0;
         });
 
+        // Actualización del movimiento del coche
         function updateCarMovement() {
-            const forwardForce = 0.8; // Fuerza aplicada hacia adelante/atrás
-            const turnForce = 0.5;  // Fuerza de rotación
-            const brakeForce = 100; // Fuerza de frenado
+    const forwardForce = 0.5; // Fuerza aplicada hacia adelante/atrás
+    const turnForce = 0.5;  // Fuerza de rotación
 
-            if (keys.w) {
-                const forward = new Vec3(
-                    Math.sin(carBody.quaternion.y) * forwardForce,
-                    0,
-                    -Math.cos(carBody.quaternion.y) * forwardForce
-                );
-                carBody.velocity.vadd(forward, carBody.velocity);
-            }
-            if (keys.s) {
-                const backward = new Vec3(
-                    -Math.sin(carBody.quaternion.y) * forwardForce,
-                    0,
-                    Math.cos(carBody.quaternion.y) * forwardForce
-                );
-                carBody.velocity.vadd(backward, carBody.velocity);
-            }
-            if (keys.a) {
-                carBody.angularVelocity.set(0, turnForce, 0);
-            }
-            if (keys.d) {
-                carBody.angularVelocity.set(0, -turnForce, 0);
-            }
-            if (keys.f) {
-                carBody.velocity.scale(0.95, carBody.velocity); // Reduce la velocidad
-            }
-        }
+    if (movement.y > 0) { // Movimiento hacia adelante
+        const forward = new Vec3(
+            Math.sin(carBody.quaternion.y) * forwardForce * movement.y,
+            0,
+            -Math.cos(carBody.quaternion.y) * forwardForce * movement.y
+        );
+        carBody.velocity.vadd(forward, carBody.velocity);
+    } else if (movement.y < 0) { // Movimiento hacia atrás
+        const backward = new Vec3(
+            -Math.sin(carBody.quaternion.y) * -movement.y * forwardForce,
+            0,
+            Math.cos(carBody.quaternion.y) * -movement.y * forwardForce
+        );
+        carBody.velocity.vadd(backward, carBody.velocity);
+    }
+
+    if (movement.x !== 0) { // Rotación
+        carBody.angularVelocity.set(0, -movement.x * turnForce, 0);
+    }
+}
+
 
         function updateCameraPosition() {
             const relativeCameraOffset = new THREE.Vector3(0, 5, -distance);
@@ -255,6 +305,15 @@ createWheelConstraints();
             if (carBody.position.z < minZ) carBody.position.z = minZ;
             if (carBody.position.z > maxZ) carBody.position.z = maxZ;
         }
+        const textureSelect = document.getElementById('textureSelect');
+    textureSelect.addEventListener('change', (event) => {
+        const textureUrl = event.target.value;
+        const loader = new THREE.TextureLoader();
+        loader.load(textureUrl, (texture) => {
+            carMaterial.map = texture;
+            carMaterial.needsUpdate = true;
+        });
+    });
         // Animación y renderizado
         function animate() {
             requestAnimationFrame(animate);
