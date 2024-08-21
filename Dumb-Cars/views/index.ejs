@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Auto con Cannon.js y Three.js</title>
+        <style>
+            body { margin: 0; }
+            canvas { display: block; }
+            #controls { position: absolute; top: 10px; left: 10px; z-index: 1; }
+            select { font-size: 16px; }
+            #joystick { 
+        position: absolute; 
+        bottom: 10px; 
+        left: 10px; 
+        width: 100px; 
+        height: 100px; 
+        background-color: rgba(0, 0, 255, 0.2); /* Añade un color de fondo para ver si se muestra */
+        border: 2px solid blue; /* Añade un borde para asegurarte de que se renderiza */
+    }
+    
+        </style>
+    </head>
+    <body>
+        <div id="controls">
+            <label for="cameraSelect">Selecciona la cámara:</label>
+            <select id="cameraSelect"></select>
+            <label for="textureSelect">Selecciona la textura:</label>
+            <select id="textureSelect">
+                <option value="textures/texture1.png">Textura 1</option>
+                <option value="textures/texture2.png">Textura 2</option>
+            </select>
+        </div>
+        <div id="joystick"></div>
+    <script src="https://cdn.jsdelivr.net/npm/nipplejs@0.8.7/dist/nipplejs.min.js"></script>
+    <script src="https://cdn.socket.io/4.5.1/socket.io.min.js"></script>
+    <script type="module" src="js/index.js"></script>
+</body>
+</html>
